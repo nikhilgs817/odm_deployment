@@ -1,0 +1,280 @@
+# Replace the marked values and verify the installed Swagger contracts before use.
+# No passwords or tokens belong in this file.
+schema_version: 1
+http:
+  timeout_seconds: 30
+  ca_bundle: null
+  allow_http: false
+
+nexus:
+  url: https://REPLACE_ME_NEXUS_HOST
+  release_repository: odm-releases
+  records_repository: odm-deployments
+  group_id: REPLACE_ME_GROUP_ID
+  username_env: NEXUS_USER
+  password_env: NEXUS_PASS
+
+apps:
+  ESERV:
+    artifact_id: eserv-release
+    ruleapp_name: REPLACE_ME_ESERV_RULEAPP
+    ruleapp_version: '1.0'
+    xom_name: REPLACE_ME_ESERV_XOM.zip
+    xom_version: '1.0'
+    library_name: REPLACE_ME_ESERV_LIBRARY
+    library_version: '1.0'
+    managed_xom_uri: reslib://REPLACE_ME_ESERV_LIBRARY/1.0
+    library_content: resuri://REPLACE_ME_ESERV_XOM.zip/1.0
+    archive_identity:
+      member: META-INF/archive.xml
+      # Use namespace-qualified XPath where needed. Omit attribute for node text.
+      checks:
+        - role: ruleapp_name
+          xpath: REPLACE_ME_VERIFIED_RULEAPP_NAME_XPATH
+          attribute: REPLACE_ME_VERIFIED_RULEAPP_NAME_ATTRIBUTE
+          equals: '{ruleapp_name}'
+        - role: ruleapp_version
+          xpath: REPLACE_ME_VERIFIED_RULEAPP_VERSION_XPATH
+          attribute: REPLACE_ME_VERIFIED_RULEAPP_VERSION_ATTRIBUTE
+          equals: '{ruleapp_version}'
+        - role: ruleset_name
+          xpath: REPLACE_ME_VERIFIED_RULESET_NAME_XPATH
+          attribute: REPLACE_ME_VERIFIED_RULESET_NAME_ATTRIBUTE
+          equals: REPLACE_ME_ESERV_RULESET
+        - role: ruleset_version
+          xpath: REPLACE_ME_VERIFIED_RULESET_VERSION_XPATH
+          attribute: REPLACE_ME_VERIFIED_RULESET_VERSION_ATTRIBUTE
+          equals: '1.0'
+    decision_center:
+      service_id: REPLACE_ME_ESERV_SERVICE_ID
+      branch_id: REPLACE_ME_ESERV_BRANCH_ID
+      deployment_id: REPLACE_ME_ESERV_DEPLOYMENT_ID
+    rulesets:
+      - name: REPLACE_ME_ESERV_RULESET
+        version: '1.0'
+        description_path: REPLACE_ME_VERIFIED_HTDS_DESCRIPTION_PATH
+        request_file: tests/fixtures/ESERV/request.json
+        expected_file: tests/fixtures/ESERV/expected.json
+        recovery_request_file: tests/fixtures/ESERV/recovery-request.json
+        recovery_expected_file: tests/fixtures/ESERV/recovery-expected.json
+  WACON:
+    artifact_id: wacon-release
+    ruleapp_name: REPLACE_ME_WACON_RULEAPP
+    ruleapp_version: '1.0'
+    xom_name: REPLACE_ME_WACON_XOM.zip
+    xom_version: '1.0'
+    library_name: REPLACE_ME_WACON_LIBRARY
+    library_version: '1.0'
+    managed_xom_uri: reslib://REPLACE_ME_WACON_LIBRARY/1.0
+    library_content: resuri://REPLACE_ME_WACON_XOM.zip/1.0
+    archive_identity:
+      member: META-INF/archive.xml
+      checks:
+        - role: ruleapp_name
+          xpath: REPLACE_ME_VERIFIED_RULEAPP_NAME_XPATH
+          attribute: REPLACE_ME_VERIFIED_RULEAPP_NAME_ATTRIBUTE
+          equals: '{ruleapp_name}'
+        - role: ruleapp_version
+          xpath: REPLACE_ME_VERIFIED_RULEAPP_VERSION_XPATH
+          attribute: REPLACE_ME_VERIFIED_RULEAPP_VERSION_ATTRIBUTE
+          equals: '{ruleapp_version}'
+        - role: ruleset_name
+          xpath: REPLACE_ME_VERIFIED_RULESET_NAME_XPATH
+          attribute: REPLACE_ME_VERIFIED_RULESET_NAME_ATTRIBUTE
+          equals: REPLACE_ME_WACON_RULESET
+        - role: ruleset_version
+          xpath: REPLACE_ME_VERIFIED_RULESET_VERSION_XPATH
+          attribute: REPLACE_ME_VERIFIED_RULESET_VERSION_ATTRIBUTE
+          equals: '1.0'
+    decision_center:
+      service_id: REPLACE_ME_WACON_SERVICE_ID
+      branch_id: REPLACE_ME_WACON_BRANCH_ID
+      deployment_id: REPLACE_ME_WACON_DEPLOYMENT_ID
+    rulesets:
+      - name: REPLACE_ME_WACON_RULESET
+        version: '1.0'
+        description_path: REPLACE_ME_VERIFIED_HTDS_DESCRIPTION_PATH
+        request_file: tests/fixtures/WACON/request.json
+        expected_file: tests/fixtures/WACON/expected.json
+        recovery_request_file: tests/fixtures/WACON/recovery-request.json
+        recovery_expected_file: tests/fixtures/WACON/recovery-expected.json
+
+tracks:
+  dev:
+    build_release: true
+    predecessor: null
+    require_approval: false
+    approval_submitters: ''
+    deployment_jobs: [odm-deploy-dev]
+    sync_jobs: [odm-sync-dev]
+    sync_apps: [ESERV, WACON]
+    res:
+      url: https://REPLACE_ME_DEV_RES_HOST/res/apiauth/v1
+      execution_urls: [https://REPLACE_ME_DEV_RUNTIME_HOST/DecisionService/rest/v1]
+      username_env: RES_USER
+      password_env: RES_PASS
+      contracts_verified: false
+      # Read paths below are documented endpoint families. Verify response selectors
+      # and all write behavior against the installed API and disposable DEV target.
+      operations: &res_operations
+        ruleapp_detail:
+          method: GET
+          path: ruleapps/{ruleapp_name}/{ruleapp_version}
+          expected: [200]
+        ruleapp_archive:
+          method: GET
+          path: ruleapps/{ruleapp_name}/{ruleapp_version}/archive
+          expected: [200]
+        ruleset_detail:
+          method: GET
+          path: ruleapps/{ruleapp_name}/{ruleapp_version}/{ruleset_name}/{ruleset_version}
+          expected: [200]
+          managed_xom_pointer: /REPLACE_ME_MANAGED_XOM_FIELD
+          enabled_pointer: /REPLACE_ME_ENABLED_FIELD
+        library_detail:
+          method: GET
+          path: libraries/{library_name}/{library_version}
+          expected: [200]
+          content_pointer: /content
+        library_update:
+          method: PUT
+          path: libraries/{library_name}/{library_version}
+          content_type: text/plain
+          expected: [200]
+        xom_versions:
+          method: GET
+          path: xoms/{xom_name}
+          expected: [200]
+          versions_pointer: /REPLACE_ME_XOM_VERSION_LIST
+          version_key: version
+        xom_archive:
+          method: GET
+          path: xoms/{xom_name}/{xom_version}/bytecode
+          expected: [200]
+        xom_publish:
+          method: POST
+          path: xoms/{xom_name}
+          content_type: application/octet-stream
+          expected: [200, 201]
+          # Set true only after testing that this operation retains old XOM bytes.
+          preserves_existing: false
+        ruleapp_publish:
+          method: POST
+          path: ruleapps
+          params: {merging: REPLACE_MERGING_POLICY}
+          content_type: application/octet-stream
+          expected: [200, 201]
+    decision_center:
+      url: https://REPLACE_ME_DEV_DC_HOST/decisioncenter-api/v1
+      username_env: DC_USER
+      password_env: DC_PASS
+      contracts_verified: false
+      baseline_is_immutable: false
+      baseline_selection_is_approval: false
+      # Default: direct RuleApp response plus a separate baseline-bound XOM download.
+      # If one verified response contains both, set output.ruleapp_member and
+      # output.xom_member to its actual ZIP member paths. If the XOM is inside
+      # the RuleApp, use output.xom_in_ruleapp_member instead. Never guess names.
+      output: {}
+      # Baseline selection must be proven immutable; no guessed baselineId defaults.
+      # Export/download paths or params must contain {baseline_id} explicitly.
+      operations: &dc_operations
+        baseline:
+          method: GET
+          path: REPLACE_ME_BASELINE_DETAIL_PATH
+          params: {}
+          expected: [200]
+          service_id_pointer: /REPLACE_ME_SERVICE_ID_FIELD
+          branch_id_pointer: /REPLACE_ME_BRANCH_ID_FIELD
+          baseline_id_pointer: /REPLACE_ME_BASELINE_ID_FIELD
+          approved_pointer: /REPLACE_ME_APPROVAL_FIELD
+          approved_value: true
+        export_baseline:
+          method: GET
+          path: REPLACE_ME_BASELINE_EXPORT_PATH
+          params: {}
+          expected: [200]
+        download_ruleapp:
+          method: GET
+          path: REPLACE_ME_BASELINE_BOUND_RULEAPP_DOWNLOAD_PATH
+          params: {}
+          expected: [200]
+        download_xom:
+          method: GET
+          path: REPLACE_ME_BASELINE_BOUND_XOM_DOWNLOAD_PATH
+          params: {}
+          expected: [200]
+        branch_revision:
+          method: GET
+          path: REPLACE_ME_BRANCH_REVISION_PATH
+          params: {}
+          expected: [200]
+          revision_pointer: /REPLACE_ME_REVISION_FIELD
+          service_id_pointer: /REPLACE_ME_SERVICE_ID_FIELD
+          branch_id_pointer: /REPLACE_ME_BRANCH_ID_FIELD
+        export_branch:
+          method: GET
+          path: REPLACE_ME_BRANCH_EXPORT_PATH
+          params: {}
+          expected: [200]
+    sync:
+      target_root: rules/dev
+      git: &git_settings
+        url: https://REPLACE_ME_GIT_HOST/odm-rules.git
+        branch: main
+        username_env: GIT_USER
+        password_env: GIT_PASS
+        author_name: ODM Jenkins
+        author_email: REPLACE_ME_AUTOMATION_EMAIL
+  int:
+    build_release: false
+    predecessor: dev
+    require_approval: false
+    approval_submitters: ''
+    deployment_jobs: [odm-deploy-int]
+    sync_jobs: [odm-sync-int]
+    sync_apps: [ESERV, WACON]
+    res:
+      url: https://REPLACE_ME_INT_RES_HOST/res/apiauth/v1
+      execution_urls: [https://REPLACE_ME_INT_RUNTIME_HOST/DecisionService/rest/v1]
+      username_env: RES_USER
+      password_env: RES_PASS
+      contracts_verified: false
+      operations: *res_operations
+    decision_center:
+      url: https://REPLACE_ME_INT_DC_HOST/decisioncenter-api/v1
+      username_env: DC_USER
+      password_env: DC_PASS
+      contracts_verified: false
+      baseline_is_immutable: false
+      baseline_selection_is_approval: false
+      operations: *dc_operations
+    sync:
+      target_root: rules/int
+      git: *git_settings
+  prod:
+    build_release: false
+    predecessor: int
+    require_approval: true
+    approval_submitters: REPLACE_ME_PRODUCTION_APPROVER_GROUP
+    deployment_jobs: [odm-deploy-prod]
+    sync_jobs: [odm-sync-prod]
+    sync_apps: [ESERV, WACON]
+    res:
+      url: https://REPLACE_ME_PROD_RES_HOST/res/apiauth/v1
+      execution_urls: [https://REPLACE_ME_PROD_RUNTIME_HOST/DecisionService/rest/v1]
+      username_env: RES_USER
+      password_env: RES_PASS
+      contracts_verified: false
+      operations: *res_operations
+    decision_center:
+      url: https://REPLACE_ME_PROD_DC_HOST/decisioncenter-api/v1
+      username_env: DC_USER
+      password_env: DC_PASS
+      contracts_verified: false
+      baseline_is_immutable: false
+      baseline_selection_is_approval: false
+      operations: *dc_operations
+    sync:
+      target_root: rules/prod
+      git: *git_settings

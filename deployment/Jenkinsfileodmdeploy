@@ -1,0 +1,69 @@
+// Parameters are configured in the Jenkins UI. This file never rewrites job settings.
+def odm(String action) {
+    sh label: "ODM ${action}", script: "set +x\npython3 -m deployment.deploy ${action} --config config/odm.yaml --plan output/deploy-plan.json --result output/deploy-result.json"
+}
+
+pipeline {
+    agent { label 'odm-python' }
+    options { disableConcurrentBuilds(); timestamps(); timeout(time: 90, unit: 'MINUTES') }
+    stages {
+        stage('Plan') {
+            steps { odm('plan') }
+        }
+        stage('Prepare release') {
+            steps {
+                script {
+                    def plan = readJSON file: 'output/deploy-plan.json'
+                    withCredentials([usernamePassword(credentialsId: 'odm-nexus', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                        if (plan.needs_build) {
+                            withCredentials([
+                                usernamePassword(credentialsId: 'odm-dc', usernameVariable: 'DC_USER', passwordVariable: 'DC_PASS'),
+                                usernamePassword(credentialsId: 'odm-git', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')
+                            ]) { odm('prepare') }
+                        } else { odm('prepare') }
+                    }
+                }
+            }
+        }
+        stage('Review deployment') {
+            steps {
+                script {
+                    def plan = readJSON file: 'output/deploy-plan.json'
+                    echo "App: ${plan.app} | Version: ${plan.jar_version} | Track: ${plan.track} | RES: ${plan.res_url} | SHA-256: ${plan.release_sha256}"
+                    if (plan.requires_approval) {
+                        timeout(time: 30, unit: 'MINUTES') {
+                            env.ODM_APPROVER = input(message: "Deploy ${plan.app} ${plan.jar_version} to ${plan.res_url}? SHA-256: ${plan.release_sha256}", ok: 'Deploy', submitter: plan.approval_submitters, submitterParameter: 'APPROVER').toString()
+                        }
+                        env.ODM_APPROVED_PLAN_HASH = plan.plan_hash
+                    }
+                }
+            }
+        }
+        stage('Deploy and test') {
+            steps {
+                script {
+                    def plan = readJSON file: 'output/deploy-plan.json'
+                    lock(resource: plan.lock_name) {
+                        withCredentials([
+                            usernamePassword(credentialsId: 'odm-res', usernameVariable: 'RES_USER', passwordVariable: 'RES_PASS'),
+                            usernamePassword(credentialsId: 'odm-nexus', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')
+                        ]) { withEnv(["ODM_TARGET_LOCK=${plan.lock_name}"]) { odm('execute') } }
+                    }
+                }
+            }
+        }
+        stage('Refresh version choices') {
+            steps {
+                script {
+                    def plan = readJSON file: 'output/deploy-plan.json'
+                    lock(resource: plan.catalog_lock_name) {
+                        withCredentials([usernamePassword(credentialsId: 'odm-nexus', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                            withEnv(["ODM_CATALOG_LOCK=${plan.catalog_lock_name}"]) { odm('catalog') }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post { always { archiveArtifacts artifacts: 'output/deploy-plan.json,output/deploy-result.json,output/catalog-result.json', allowEmptyArchive: true } }
+}

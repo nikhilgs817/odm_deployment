@@ -1,0 +1,28 @@
+// Set DEPLOYMENT_TRACK and the cron schedule in the Jenkins UI.
+pipeline {
+    agent { label 'odm-python' }
+    options { disableConcurrentBuilds(); timestamps(); timeout(time: 30, unit: 'MINUTES') }
+    stages {
+        stage('Plan sync') {
+            steps { sh 'set +x\npython3 -m sync.sync plan --config config/odm.yaml --output output/sync-result.json' }
+        }
+        stage('Sync rules') {
+            steps {
+                script {
+                    def plan = readJSON file: 'output/sync-result.json'
+                    lock(resource: plan.lock_name) {
+                        withCredentials([
+                            usernamePassword(credentialsId: 'odm-dc', usernameVariable: 'DC_USER', passwordVariable: 'DC_PASS'),
+                            usernamePassword(credentialsId: 'odm-git', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')
+                        ]) {
+                            withEnv(["ODM_SYNC_LOCK=${plan.lock_name}"]) {
+                                sh 'set +x\npython3 -m sync.sync run --config config/odm.yaml --output output/sync-result.json'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post { always { archiveArtifacts artifacts: 'output/sync-result.json', allowEmptyArchive: true } }
+}
